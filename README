@@ -1,0 +1,28 @@
+RubyWBEM is a pure-Ruby library for performing operations using the WBEM
+management protocol. RubyWBEM originated as a direct port of PyWbem
+0.4, updated to the svn head as of revision 120.
+
+
+
+changes from PyWbem:
+
+support url-embedded credentials in parse_url, wbem_request, etc.
+
+basic eql?, hash method definitions for xml objects 
+  needs further refinement to check for semantic equality rather than just looking at
+  the XML string, and not really tested for types other than
+  CIMInstanceName
+
+Created valid_cimtype method which returns true if a value is a valid
+  cim type (extends CIMType or is an appropriate native type (such as
+  String, etc.)
+
+When setting properties for a CIMInstance, allow setting of
+  CIMProperty objects as well as values (to facilitate populating
+  property values from properties obtained from a GetClass call)
+
+CIMType changes:
+  Since ruby doesn't support true multiple inheritance, CIMType wraps
+  the base type value rather than extending it
+
+  Added boolean CIMType (although raw booleans are still supported)
