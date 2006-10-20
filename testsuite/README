@@ -1,0 +1,13 @@
+This directory contains the tests for RubyWBEM.
+
+The CIM operations test depends on ruby-password and ruby-termios
+(available at http://www.caliban.org/ruby/ruby-password.shtml) 
+
+To run the CIM operations test, the test.mof file must be loaded in to
+the repository.  Under Pegasus, this done by setting the
+repositoryIsDefaultProvider configuration variable to true.
+
+# cimconfig -s repositoryIsDefaultInstanceProvider=true -p
+# cimmof < test.mof
+
+Pegasus must be restarted in order for the change to take effect.

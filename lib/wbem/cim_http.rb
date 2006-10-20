@@ -63,7 +63,8 @@ module WBEM
         return host, port, ssl, creds
     end
 
-    def WBEM.wbem_request(url, data, creds, headers = [], debug = 0, x509 = nil)
+    def WBEM.wbem_request(url, data, creds, headers = [], debug = 0, x509 = nil,
+                          verify_callback = nil)
         #"""Send XML data over HTTP to the specified url. Return the
         #response in XML.  Uses Python's build-in httplib.  x509 may be a
         #dictionary containing the location of the SSL certificate and key
@@ -81,22 +82,30 @@ module WBEM
                 key_file = nil
             end
             h.use_ssl = true
+            unless verify_callback.nil?
+                h.verify_mode = OpenSSL::SSL::VERIFY_PEER
+                h.verify_callback = verify_callback
+            end
             # key_file, cert_file ???
         end    
         data = "<?xml version='1.0' encoding='utf-8' ?>\n" + data
         response = nil
-        h.start do |http|
-            request = Net::HTTP::Post.new("/cimom")
-            request.basic_auth creds[0], creds[1]
-            request.content_type = "application/xml"
-            request.content_length = data.length
-            headers.each do |header|
-                s = header.split(":", 2).collect { |x| x.strip }
-                request.add_field(URI.escape(s[0]), URI.escape(s[1]))
+        begin
+            h.start do |http|
+                request = Net::HTTP::Post.new("/cimom")
+                request.basic_auth creds[0], creds[1]
+                request.content_type = "application/xml"
+                request.content_length = data.length
+                headers.each do |header|
+                    s = header.split(":", 2).collect { |x| x.strip }
+                    request.add_field(URI.escape(s[0]), URI.escape(s[1]))
+                end
+                #            STDOUT << "request: #{data}\n"
+                response = http.request(request, data)
+                #            STDOUT << "response: #{response.body}\n"
             end
-#            STDOUT << "request: #{data}\n"
-            response = http.request(request, data)
-#            STDOUT << "response: #{response.body}\n"
+        rescue OpenSSL::SSL::SSLError => arg
+            raise CIMHttpError, "SSL error: %s" % (arg)
         end
         unless response.kind_of?(Net::HTTPSuccess)
             if (response.kind_of?(NET::HTTPUnauthorized))
@@ -124,8 +133,8 @@ module WBEM
         
         # CIMLocalClassPath
 
-        if obj.kind_of?(CIMLocalClassPath)
-            return "CIMObject: #{obj.localnamespacepath}:#{obj.classname}"
+        if obj.kind_of?(CIMClassName)
+            return "CIMObject: #{obj.namespace}:#{obj.classname}"
         end
             # CIMInstanceName with namespace
             

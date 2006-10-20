@@ -73,16 +73,26 @@ module WBEM
         #The caller may also register callback functions which are passed
         #the request before it is sent, and the reply before it is
         #unpacked.
+     
+        # verify_callback is used to verify the server certificate.
+        # It is passed to OpenSSL.SSL.set_verify, and is called during the SSL
+        # handshake.  verify_callback should take five arguments: A Connection
+        # object, an X509 object, and three integer variables, which are in turn
+        # potential error number, error depth and return code. verify_callback
+        # should return True if verification passes and False otherwise.
         #"""
     
-        attr_reader :url, :creds, :x509, :last_request, :last_raw_request, :last_reply, :default_namespace
+        attr_reader :url, :creds, :x509, :last_request, :last_raw_request, :last_reply, :default_namespace, :debug, :verify_callback
+        attr_writer :debug
         def initialize(url, creds = nil, default_namespace = DEFAULT_NAMESPACE,
-                       x509 = nil)
+                       x509 = nil, verify_callback = nil)
             @url = url
             @creds = creds
             @x509 = x509
+            @verify_callback = verify_callback
             @last_request = @last_reply = ''
             @default_namespace = default_namespace
+            @debug = false
         end
         
         def to_s
@@ -103,16 +113,14 @@ module WBEM
             #methods of the connection, such as EnumerateInstanceNames,
             #etc."""
             
-            # If a LocalNamespacePath wasn't specified, use the default one
-
-            localnamespacepath = params.delete(:LocalNamespacePath)
-            localnamespacepath = self.default_namespace if localnamespacepath.nil?
+            namespace = params.delete(:namespace)
+            #namespace = self.default_namespace if namespace.nil?
 
             # Create HTTP headers
             
             headers = ["CIMOperation: MethodCall",
                        "CIMMethod: #{methodname}",
-                       WBEM.get_object_header(localnamespacepath)]
+                       WBEM.get_object_header(namespace)]
 
             # Create parameter list
             plist = params.to_a.collect do |x|
@@ -122,7 +130,7 @@ module WBEM
             # Build XML request
             
             req_xml = CIM.new(MESSAGE.new(SIMPLEREQ.new(IMETHODCALL.new(methodname,
-                                                                        LOCALNAMESPACEPATH.new(localnamespacepath.split("/").collect do |ns| 
+                                                                        LOCALNAMESPACEPATH.new(namespace.split("/").collect do |ns| 
                                                                                                    NAMESPACE.new(ns) 
                                                                                                end
                                                                                                ),
@@ -130,15 +138,20 @@ module WBEM
                                           '1001', '1.0'),
                               '2.0', '2.0')
             
-            @last_raw_request = ""
-            @last_request = ""
-            req_xml.write(@last_raw_request)
-            req_xml.write(@last_request, 2)
+            current_raw_request = ""
+            req_xml.write(current_raw_request)
+            if @debug
+                @last_raw_request = current_raw_request
+                @last_request = ""
+                @last_reply = ""
+                @last_raw_reply = ""
+                req_xml.write(@last_request, 2)
+            end
             # Get XML response
 
             begin
                 resp_xml = WBEM.wbem_request(self.url, @last_raw_request, self.creds, 
-                                             headers, 0, self.x509)
+                                             headers, 0, self.x509, verify_callback)
             rescue AuthError =>
                 raise
             rescue CIMHttpError => arg
@@ -152,11 +165,13 @@ module WBEM
 
             ## We want to not insert any newline characters, because
             ## they're already present and we don't want them duplicated.
-            @last_reply = ""
-            @last_raw_reply = ""
-            reply_dom.write(@last_reply, 2)
-            reply_dom.write(@last_raw_reply)
-#            STDOUT << "response: #{@last_reply}\n"
+            if @debug
+                @last_reply = ""
+                @last_raw_reply = ""
+                reply_dom.write(@last_reply, 2)
+                reply_dom.write(@last_raw_reply)
+                #            STDOUT << "response: #{@last_reply}\n"
+            end
 
             # Parse response
             tmptt = WBEM.dom_to_tupletree(reply_dom)
@@ -241,22 +256,26 @@ module WBEM
                                           '1001', '1.0'),
                               '2.0', '2.0')
 
-            @last_raw_request = ""
-            @last_request = ""
-            req_xml.write(@last_raw_request)
-            req_xml.write(@last_request, 2)
+            current_raw_request = ""
+            req_xml.write(current_raw_request)
+            if @debug
+                @last_request = ""
+                req_xml.write(@last_request, 2)
+            end
 
             # Get XML response
 
             begin
-                resp_xml = WBEM.wbem_request(self.url, @last_raw_request, self.creds, 
-                                             headers)
+                resp_xml = WBEM.wbem_request(self.url, current_raw_request, self.creds, 
+                                             headers, self.x509, self.verify_callback)
             rescue CIMHttpError => arg
                 # Convert cim_http exceptions to CIMError exceptions
                 raise CIMError.new(0), arg.to_s
             end
 
-            @last_reply = resp_xml
+            if @debug
+                @last_reply = resp_xml
+            end
 
             tt = WBEM.parse_cim(WBEM.xml_to_tupletree(resp_xml))
 
@@ -303,21 +322,30 @@ module WBEM
         def EnumerateInstanceNames(className, params = {})
             #"""Enumerate instance names of a given classname.  Returns a
             #list of CIMInstanceName objects."""
+
+            params[:namespace] = self.default_namespace unless params[:namespace]
+            namespace = params[:namespace]
             result = self.imethodcall("EnumerateInstanceNames",
                                       params.merge(Hash[:ClassName => CIMClassName.new(className)]))
 
-            return result[2] unless result.nil?
-            return []
+            names = []
+            names = result[2] unless result.nil?
+            names.each {|n| n.method("namespace=").call(namespace)}
+            return names
         end
 
         def EnumerateInstances(className, params = {})
             #"""Enumerate instances of a given classname.  Returns a list
-            #of CIMInstance objects."""
+            #of CIMInstance objects with paths."""
 
+            params[:namespace] = self.default_namespace unless params[:namespace]
+            namespace = params[:namespace]
             result = self.imethodcall('EnumerateInstances',
                                       params.merge(Hash[:ClassName => CIMClassName.new(className)]))
-            return result[2] unless result.nil?
-            return []
+            instances = []
+            instances = result[2] unless result.nil?
+            instances.each {|n| n.path.method("namespace=").call(namespace)}
+            return instances
         end
 
         def GetInstance(instancename, params = {})
@@ -328,10 +356,18 @@ module WBEM
             iname = instancename.clone
             iname.host = nil
             iname.namespace = nil
+            params[:InstanceName] = iname
 
-            result = self.imethodcall("GetInstance",
-                                      params.merge(Hash[:InstanceName => iname]))
-            return result[2][0]
+            if instancename.namespace.nil?
+                params[:namespace] = self.default_namespace
+            else
+                params[:namespace] = instancename.namespace
+            end
+
+            result = self.imethodcall("GetInstance", params)
+            instance = result[2][0]
+            instance.path= iname
+            return instance
         end
 
         def DeleteInstance(instancename, params = {})
@@ -341,23 +377,42 @@ module WBEM
             iname = instancename.clone
             iname.host = nil
             iname.namespace = nil
+            params[:InstanceName] = iname
 
-            self.imethodcall("DeleteInstance",
-                             params.merge(Hash[:InstanceName => iname]))
+            if instancename.namespace.nil?
+                params[:namespace] = self.default_namespace
+            else
+                params[:namespace] = instancename.namespace
+            end
+
+            self.imethodcall("DeleteInstance", params)
         end
 
         def CreateInstance(newinstance, params = {})
             #"""Create an instance.  Returns the name for the instance."""
+
+            if newinstance.path.nil?
+                raise ArgumentError, 'newinstance parameter must have path attribute set'
+            end
+
+            if newinstance.path.namespace.nil?
+                params[:namespace] = self.default_namespace
+            else
+                params[:namespace] = newinstance.path.namespace
+            end
+            namespace = params[:namespace]
 
             # Strip off path to avoid producing a VALUE.NAMEDINSTANCE
             # element instead of an INSTANCE element.
 
             instance = newinstance.clone
             instance.path = nil
+            params[:NewInstance] = instance
 
-            result = self.imethodcall("CreateInstance",
-                                      params.merge(Hash[:NewInstance => instance]))
-            return result[2][0]
+            result = self.imethodcall("CreateInstance", params)
+            name = result[2][0]
+            name.namespace = namespace
+            return name
         end
 
         def ModifyInstance(modifiedinstance, params = {})
@@ -367,18 +422,56 @@ module WBEM
             if modifiedinstance.path.nil?
                 raise ArgumentError, 'modifiedinstance parameter must have path attribute set'
             end
+            if modifiedinstance.path.namespace.nil?
+                params[:namespace] = self.default_namespace
+            else
+                params[:namespace] = modifiedinstance.path.namespace
+            end
+            instance = modifiedinstance.clone
+            instance.path.namespace = nil
+            params[:ModifiedInstance] = instance
         
-            return self.imethodcall("ModifyInstance",
-                                    params.merge(Hash[:ModifiedInstance => modifiedinstance]))
+            return self.imethodcall("ModifyInstance", params)
         end
 
+        def ExecQuery(queryLanguage, query, namespace = nil)
+            namespace = self.default_namespace if namespace.nil?
+            
+            result = self.imethodcall(
+                'ExecQuery',
+                :namespace => namespace,
+                :QueryLanguage => queryLanguage,
+                :Query => query)
+    
+            instances = []
+    
+            unless result.nil?
+                instances = result[2].collect {|tt| tt[2]}
+            end
+
+            instances.each {|i| i.path.method("namespace=").call(namespace)}
+            return instances
+        end
+    
         #
         # Schema management API
         #
         
+        def _map_classname_param(params)
+            #"""Convert string ClassName parameter to a CIMClassName."""
+    
+            if (params.has_key?(:ClassName) and params[:ClassName].is_a?(String))
+                params[:ClassName] = CIMClassName.new(params[:ClassName])
+            end
+            return params
+        end
+
         def EnumerateClassNames(params = {})
             #"""Return a list of CIM class names. Names are returned as strings."""
         
+            params = self._map_classname_param(params)
+            params[:namespace] = self.default_namespace if params[:namespace].nil?
+
             result = self.imethodcall("EnumerateClassNames",
                                       params)
             
@@ -388,6 +481,9 @@ module WBEM
     
         def EnumerateClasses(params = {})
             #"""Return a list of CIM class objects."""
+
+            params = self._map_classname_param(params)
+            params[:namespace] = self.default_namespace if params[:namespace].nil?
 
             result = self.imethodcall("EnumerateClasses",
                                       params)
@@ -400,8 +496,10 @@ module WBEM
         def GetClass(className, params = {})
             #"""Return a CIMClass representing the named class."""
             
-            result = self.imethodcall("GetClass",
-                                      params.merge(Hash[:ClassName => CIMClassName.new(className)]))
+            params = self._map_classname_param(params)
+            params[:namespace] = self.default_namespace if params[:namespace].nil?
+            params[:ClassName] = CIMClassName.new(className)
+            result = self.imethodcall("GetClass", params)
             
             return result[2][0]
         end
@@ -411,8 +509,10 @@ module WBEM
 
             # UNSUPPORTED (but actually works)
 
-            self.imethodcall("DeleteClass",
-                             params.merge(Hash[:ClassName => CIMClassName.new(className)]))
+            params = self._map_classname_param(params)
+            params[:namespace] = self.default_namespace if params[:namespace].nil?
+            params[:ClassName] = CIMClassName.new(className)
+            self.imethodcall("DeleteClass", params)
         end
 
         def ModifyClass(modifiedClass, params = {})
@@ -420,8 +520,9 @@ module WBEM
 
             # UNSUPPORTED
 
-            self.imethodcall('ModifyClass',
-                             params.merge(Hash[:ModifiedClass => modifiedClass]))
+            params[:namespace] = self.default_namespace if params[:namespace].nil?
+            params[:ModifiedClass] = CIMClassName.new(modifiedClass)
+            self.imethodcall('ModifyClass', params)
         end
 
         def CreateClass(newClass, params = {})
@@ -429,8 +530,9 @@ module WBEM
 
             # UNSUPPORTED
 
-            self.imethodcall('CreateClass',
-                             params.merge(Hash[:NewClass => newClass]))
+            params[:namespace] = self.default_namespace if params[:namespace].nil?
+            params[:NewClass] = CIMClassName.new(newClass)
+            self.imethodcall('CreateClass', params)
         end
         #
         # Association provider API
@@ -441,7 +543,8 @@ module WBEM
             #name) to a dictionary of parameter names."""
             
             if (object.is_a?(CIMClassName) or object.is_a?(CIMInstanceName))
-                params[:ObjectName] = object
+                params[:ObjectName] = object.clone
+                params[:ObjectName].namespace = nil
             elsif (object.is_a?(String))
                 params[:ObjectName] = CIMClassName.new(object)
             else
@@ -475,6 +578,10 @@ module WBEM
             params = self._map_association_params(params)
             params = self._add_objectname_param(params, object_name)
             
+            params[:namespace] = self.default_namespace
+            if (object_name.is_a?(CIMInstanceName) && !object_name.namespace.nil?)
+                params[:namespace] = object_name.namespace
+            end
             result = self.imethodcall("Associators",
                                       params)
             
@@ -493,6 +600,10 @@ module WBEM
             params = self._map_association_params(params)
             params = self._add_objectname_param(params, object_name)
             
+            params[:namespace] = self.default_namespace
+            if (object_name.is_a?(CIMInstanceName) && !object_name.namespace.nil?)
+                params[:namespace] = object_name.namespace
+            end
             result = self.imethodcall("AssociatorNames",
                                       params)
             return [] if result.nil?
@@ -509,6 +620,10 @@ module WBEM
             params = self._map_association_params(params)
             params = self._add_objectname_param(params, object_name)
             
+            params[:namespace] = self.default_namespace
+            if (object_name.is_a?(CIMInstanceName) && !object_name.namespace.nil?)
+                params[:namespace] = object_name.namespace
+            end
             result = self.imethodcall("References",
                                       params)
             return [] if result.nil?
@@ -525,6 +640,10 @@ module WBEM
             params = self._map_association_params(params)
             params = self._add_objectname_param(params, object_name)
             
+            params[:namespace] = self.default_namespace
+            if (object_name.is_a?(CIMInstanceName) && !object_name.namespace.nil?)
+                params[:namespace] = object_name.namespace
+            end
             result = self.imethodcall("ReferenceNames",
                                       params)
             return [] if result.nil?
@@ -537,16 +656,16 @@ module WBEM
         
         def InvokeMethod(methodname, objectname, params = {})
             
-            obj = objectname.clone
+            obj = objectname
             
             if (obj.is_a?(String))
-                obj = CIMLocalClassPath.new(self.default_namespace, obj)
+                obj = CIMClassName.new(obj, nil, self.default_namespace)
             end
 
             if obj.is_a?(CIMInstanceName) and obj.namespace.nil?
-                obj.namespace = DEFAULT_NAMESPACE
+                obj = objectname.clone
+                obj.namespace = self.default_namespace
             end
-
             result = self.methodcall(methodname, obj, params)
             
             # Convert the RETURNVALUE into a Ruby object

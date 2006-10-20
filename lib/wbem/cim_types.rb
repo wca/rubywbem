@@ -150,7 +150,7 @@ module WBEM
             return 'boolean'
         elsif (obj.is_a?(String)) # unicode?
             return 'string'
-        elsif (obj.is_a?(CIMClassName) || obj.is_a?(CIMLocalClassPath) || obj.is_a?(CIMInstanceName))
+        elsif (obj.is_a?(CIMClassName) || obj.is_a?(CIMInstanceName))
             return 'reference'
         elsif (obj.is_a?(DateTime) or obj.is_a?(TimeDelta))
             return 'datetime'

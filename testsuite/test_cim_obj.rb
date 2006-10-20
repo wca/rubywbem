@@ -406,6 +406,16 @@ module WBEM
                 self.assert_(i['Name'] == 'Foo')
                 self.assert_(i.qualifiers['Key'] == 'Value')
                 self.assert_(i.path == CIMInstanceName.new('CIM_Foo', {'Name' => 'Foo'}))
+
+                # Test clone when path is None
+    
+                i = CIMInstance.new('CIM_Foo',
+                                    {'Name' => 'Foo', 'Chicken' => 'Ham'},
+                                    {'Key' => 'Value'},
+                                    nil)
+    
+                self.assert_(i == i.clone)
+
             end
         end
 
@@ -546,7 +556,6 @@ module WBEM
             #"""Test string representation functions for CIMInstance objects."""
             
             def runtest
-
                 obj = CIMInstance.new('CIM_Foo', {'Name' => 'Spottyfoot',
                                           'Ref1' => CIMInstanceName.new('CIM_Bar')})
 
@@ -666,6 +675,7 @@ module WBEM
                 # Basic CIMProperty initialisations
 
                 CIMProperty.new('Spotty', 'Foot', 'string')
+                CIMProperty.new('Spotty', nil, 'string')
                 #CIMProperty(u'Name', u'Brad')
                 CIMProperty.new('Age', Uint16.new(32))
                 CIMProperty.new('Age', nil, 'uint16')
@@ -792,6 +802,9 @@ module WBEM
 
                 self.assert_equal(CIMProperty.new('Spotty', nil, 'string'),
                                   CIMProperty.new('Spotty', nil, 'string'))
+
+                self.assert_notequal(CIMProperty.new('Spotty', '', 'string'),
+                                     CIMProperty.new('Spotty', nil, 'string'))
 
                 self.assert_equal(CIMProperty.new('Spotty', 'Foot'),
                                   CIMProperty.new('Spotty', 'Foot'))
@@ -1078,7 +1091,7 @@ module WBEM
         class CIMClassEquality < Comfychair::TestCase
 
             def runtest
-
+                
                 self.assert_equal(CIMClass.new('CIM_Foo'), CIMClass.new('CIM_Foo'))
                 self.assert_equal(CIMClass.new('CIM_Foo'), CIMClass.new('cim_foo'))
 
@@ -1090,7 +1103,7 @@ module WBEM
                 methods = {'Delete' => CIMMethod.new('Delete')}
 
                 qualifiers = {'Key' => CIMQualifier.new('Key', true)}
-
+                
                 self.assert_notequal(CIMClass.new('CIM_Foo'),
                                      CIMClass.new('CIM_Foo', properties))
 
@@ -1099,6 +1112,11 @@ module WBEM
                 
                 self.assert_notequal(CIMClass.new('CIM_Foo'),
                                      CIMClass.new('CIM_Foo', nil, qualifiers))
+
+                self.assert_equal(CIMClass.new('CIM_Foo', nil, nil, 
+                                               nil, 'CIM_Bar'),
+                                  CIMClass.new('CIM_Foo', nil, nil, 
+                                               nil, 'cim_bar'))
             end
         end
 
@@ -1578,6 +1596,8 @@ module WBEM
                  CIMClassString,
                  CIMClassToXML,
 
+                 # TODO: CIMClassName
+    
                  # CIMMethod
 
                  InitCIMMethod,

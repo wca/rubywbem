@@ -433,7 +433,7 @@ module WBEM
 
         host = WBEM.parse_host(k[0])
         localnspath = WBEM.parse_localnamespacepath(k[1])
-        return CIMNamespacePath.new(host, localnspath)
+        return [host, localnspath]
     end
 
     def WBEM.parse_localnamespacepath(tt)
@@ -476,8 +476,8 @@ module WBEM
         end
         nspath = WBEM.parse_namespacepath(k[0])
         classname = WBEM.parse_classname(k[1])
-        return CIMClassPath.new(nspath.host, nspath.localnamespacepath,
-                                classname.classname)
+        return CIMClassName.new(classname.classname,
+                                nspath[0], nspath[1])
     end
 
     def WBEM.parse_localclasspath(tt)
@@ -490,7 +490,8 @@ module WBEM
         end
         localnspath = WBEM.parse_localnamespacepath(k[0])
         classname = WBEM.parse_classname(k[1])
-        return CIMLocalClassPath.new(localnspath, classname.classname)
+        return CIMClassName.new(classname.classname,
+                                nil, localnspath)
     end
 
     def WBEM.parse_classname(tt)
@@ -515,11 +516,11 @@ module WBEM
         end
         nspath = WBEM.parse_namespacepath(k[0])
         instancename = WBEM.parse_instancename(k[1])
-        instancename.host = nspath.host
-        instancename.namespace = nspath.localnamespacepath
+        instancename.host = nspath[0]
+        instancename.namespace = nspath[1]
         
         return instancename
-        end
+    end
 
     def WBEM.parse_localinstancepath(tt)
 #     """
@@ -1137,8 +1138,6 @@ module WBEM
 #     Looks at the TYPE of the node to work out how to decode it.
 #     Handles nodes with no value (e.g. in CLASS.)
 #     """
-        val = WBEM.list_of_matching(tt, ["VALUE", "VALUE.ARRAY"])
-
         ## TODO: Handle VALUE.REFERENCE, VALUE.REFARRAY
 
         valtype = WBEM.attrs(tt)["TYPE"]
@@ -1152,7 +1151,7 @@ module WBEM
     
         if raw_val.is_a?(Array)
             return raw_val.collect { |x| tocimobj(valtype, x) }
-        elif raw_val.empty?
+        elif raw_val.empty? and valtype != "string"
             return nil
         else
             return WBEM.tocimobj(valtype, raw_val)

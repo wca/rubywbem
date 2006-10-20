@@ -1,0 +1,42 @@
+class RubyWBEM_Person : CIM_Person {
+};
+
+class RubyWBEM_PersonCollection : CIM_ConcreteCollection {
+};
+
+class RubyWBEM_MemberOfPersonCollection : CIM_MemberOfCollection {
+};
+
+instance of RubyWBEM_Person as $Alice {
+	CreationClassName = "RubyWBEM_Person";
+	Name = "Alice";
+};
+
+instance of RubyWBEM_Person as $Bob {
+	CreationClassName = "RubyWBEM_Person";
+	Name = "Bob";
+};
+
+instance of RubyWBEM_Person as $Charlie {
+	CreationClassName = "RubyWBEM_Person";
+	Name = "Charlie";
+};
+
+instance of RubyWBEM_PersonCollection as $Collection {
+	InstanceID = "PersonCollection";
+};
+
+instance of RubyWBEM_MemberOfPersonCollection {
+	Collection = $Collection;
+	Member = $Alice;
+};
+
+instance of RubyWBEM_MemberOfPersonCollection {
+	Collection = $Collection;
+	Member = $Bob;
+};
+
+instance of RubyWBEM_MemberOfPersonCollection {
+	Collection = $Collection;
+	Member = $Charlie;
+};

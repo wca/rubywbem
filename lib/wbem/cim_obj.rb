@@ -30,10 +30,6 @@ require "date"
 #which returns a string.
 #"""
 
-#
-# Base objects
-#
-
 module WBEM
 
     class NocaseHash < Hash
@@ -164,70 +160,26 @@ module WBEM
         end
     end
 
-    #
-    # Object location classes
-    #
+    class CIMClassName < XMLObject
 
-    #
-    # It turns out that most of the object location elements can be
-    # represented easily using one base class which roughly corresponds to
-    # the OBJECTPATH element.
-    #
-    # Element Name        (host,       namespace,    classname, instancename)
-    # ---------------------------------------------------------------------------
-    # CLASSNAME           (None,       None,         'CIM_Foo', None)
-    # LOCALNAMESPACEPATH  (None,       'root/cimv2', None,      None)
-    # NAMESPACEPATH       ('leonardo', 'root/cimv2', None,      None)
-    # LOCALCLASSPATH      (None,       'root/cimv2', 'CIM_Foo', None)
-    # CLASSPATH           ('leonardo', 'root/cimv2', 'CIM_Foo', None)
-    # LOCALINSTANCEPATH   (None,       'root/cimv2', None,      InstanceName)
-    # INSTANCEPATH        ('leonardo', 'root/cimv2', None,      InstanceName)
-    #
-    # These guys also have string representations similar to the output
-    # produced by the Pegasus::CIMObjectPath.toString() method:
-    #
-    # Element Name        Python Class           String representation
-    # ---------------------------------------------------------------------------
-    # CLASSNAME           CIMClassName           CIM_Foo
-    # LOCALNAMESPACEPATH  String                 root/cimv2:
-    # NAMESPACEPATH       CIMNamespacePath       //leo/root/cimv2:
-    # LOCALCLASSPATH      CIMLocalClassPath      root/cimv2:CIM_Foo
-    # CLASSPATH           CIMClassPath           //leo/root/cimv2:CIM_Foo
-    # INSTANCENAME        CIMInstanceName        CIM_Foo.Foo="Bar"
-    # LOCALINSTANCEPATH   CIMLocalInstancePath   root/cimv2:CIM_Foo.Foo="Bar"
-    # INSTANCEPATH        CIMInstancePath        //leo/root/cimv2:CIM_Foo.Foo="Bar"
-    #
+        attr_writer :classname, :host, :namespace
+        attr_reader :classname, :host, :namespace
 
-    class CIMObjectLocation < XMLObject
-        include Comparable
-        #"""A base class that can name any CIM object."""
-
-        attr_writer :host, :localnamespacepath, :classname, :instancename
-        attr_reader :host, :localnamespacepath, :classname, :instancename
-
-        def initialize(host = nil, localnamespacepath = nil,
-                       classname = nil, instancename = nil)
+        def initialize(classname, host = nil, namespace = nil)
+            unless classname.kind_of?(String)
+                raise TypeError, "classname argument must be a string"
+            end
+            
+            # TODO: There are some odd restrictions on what a CIM
+            # classname can look like (i.e must start with a
+            # non-underscore and only one underscore per classname).
+            @classname=classname
             @host = host
-            @localnamespacepath = localnamespacepath
-            @classname = classname
-            @instancename = instancename
+            @namespace = namespace
         end
 
-        def HOST
-            HOST.new(@host)
-        end
-
-        def CLASSNAME
-            CLASSNAME.new(@classname)
-        end
-
-        def LOCALNAMESPACEPATH
-            nsArray = @localnamespacepath.split("/").collect { |name| NAMESPACE.new(name) }
-            LOCALNAMESPACEPATH.new(nsArray)
-        end
-
-        def NAMESPACEPATH
-            NAMESPACEPATH.new(self.HOST, self.LOCALNAMESPACEPATH)
+        def clone
+            return CIMClassName.new(@classname, @host, @namespace)
         end
 
         def eql?(other)
@@ -239,114 +191,53 @@ module WBEM
         def <=>(other)
             if equal?(other)
                 return 0
-            elsif (!other.kind_of?(CIMObjectLocation))
+            elsif (!other.kind_of?(CIMClassName))
                 return 1
             end
-            ret_val = cmpname(self.host, other.host)
-            ret_val = nilcmp(self.localnamespacepath, other.localnamespacepath) if (ret_val == 0)
-            ret_val = cmpname(lclassname, lOclassname) if (ret_val == 0)
-            ret_val = nilcmp(self.instancename, other.instancename) if (ret_val == 0)
+            ret_val = cmpname(self.classname, other.classname) 
+            ret_val = cmpname(self.host, other.host) if (ret_val == 0)
+            ret_val = nilcmp(self.namespace, other.namespace) if (ret_val == 0)
             ret_val
         end
-    end
 
-    class CIMClassName < CIMObjectLocation
-        def initialize(classname)
-            unless classname.kind_of?(String)
-                raise TypeError, "classname argument must be a string"
+        def to_s
+            s = ''
+
+            unless self.host.nil?
+                s += '//%s/' % self.host
             end
-            
-            # TODO: There are some odd restrictions on what a CIM
-            # classname can look like (i.e must start with a
-            # non-underscore and only one underscore per classname).
-            super()
-            self.classname=classname
+            unless self.namespace.nil?
+                s += '%s:' % self.namespace
+            end
+            s += self.classname
+            return s
         end
 
         def tocimxml
-            self.CLASSNAME
+            classnamexml = CLASSNAME.new(self.classname)
+
+            unless self.namespace.nil?
+
+                localnsp = LOCALNAMESPACEPATH.new(
+                        self.namespace.split('/').collect { |ns| NAMESPACE.new(ns)})
+
+                unless self.host.nil?
+
+                    # Classname + namespace + host = CLASSPATH
+
+                    return CLASSPATH.new(NAMESPACEPATH.new(HOST.new(self.host), 
+                                                           localnsp), 
+                                         classnamexml)
+                end
+                # Classname + namespace = LOCALCLASSPATH
+                return LOCALCLASSPATH.new(localnsp, classnamexml)
+            end
+            # Just classname = CLASSNAME
+            return classnamexml
         end
         
-        def to_s
-            self.classname
-        end
 
     end
-
-    class CIMNamespacePath < CIMObjectLocation
-        def initialize(host, localnamespacepath)
-            unless host.kind_of?(String)
-                raise TypeError, "host argument must be a string"
-            end
-            unless localnamespacepath.kind_of?(String)
-                raise TypeError, "localnamespacepath argument must be a string"
-            end
-            
-            super()
-            self.host=host
-            self.localnamespacepath=localnamespacepath
-        end
-
-        def tocimxml
-            self.NAMESPACEPATH
-        end
-        
-        def to_s
-            "//#{self.host}/#{self.localnamespacepath}"
-        end
-    end
-
-    class CIMLocalClassPath < CIMObjectLocation
-        def initialize(localnamespacepath, classname)
-            unless localnamespacepath.kind_of?(String)
-                raise TypeError, "localnamespacepath argument must be a string"
-            end
-            unless classname.kind_of?(String)
-                raise TypeError, "classname argument must be a string"
-            end
-            
-            super()
-            self.classname=classname
-            self.localnamespacepath=localnamespacepath
-        end
-
-        def tocimxml
-            LOCALCLASSPATH.new(self.LOCALNAMESPACEPATH, self.CLASSNAME)
-        end
-        
-        def to_s
-            "#{self.localnamespacepath}:#{self.classname}"
-        end
-    end
-
-    class CIMClassPath < CIMObjectLocation
-        def initialize(localnamespacepath, classname)
-            unless host.kind_of?(String)
-                raise TypeError, "host argument must be a string"
-            end
-            unless localnamespacepath.kind_of?(String)
-                raise TypeError, "localnamespacepath argument must be a string"
-            end
-            unless classname.kind_of?(String)
-                raise TypeError, "classname argument must be a string"
-            end
-            
-            super()
-            self.host=host
-            self.classname=classname
-            self.localnamespacepath=localnamespacepath
-        end
-
-        def tocimxml
-            CLASSPATH.new(self.NAMESPACEPATH, self.CLASSNAME)
-        end
-        
-        def to_s
-            "//#{self.host}/#{self.localnamespacepath}:#{self.classname}"
-        end
-    end
-
-    # Object value elements
 
     class CIMProperty < XMLObject
         include Comparable
@@ -496,7 +387,7 @@ module WBEM
         end
 
         def clone
-            CIMInstanceName.new(@classname, @keybindings, @host, @namespace)
+            return CIMInstanceName.new(@classname, @keybindings, @host, @namespace)
         end
 
         def <=>(other)
@@ -624,7 +515,7 @@ module WBEM
             else
                 # Value reference
             
-                return instancename_xml = INSTANCENAME.new(self.classname, self.keybindings.nil? ? nil : VALUE_REFERENCE.new(self.keybindings.tocimxml()))
+                instancename_xml = INSTANCENAME.new(self.classname, self.keybindings.nil? ? nil : VALUE_REFERENCE.new(self.keybindings.tocimxml()))
             end
             # Instance name plus namespace = LOCALINSTANCEPATH
 
@@ -675,7 +566,9 @@ module WBEM
         end
         
         def clone
-            CIMInstance.new(@classname, @properties, @qualifiers, @path)
+            result = CIMInstance.new(@classname, @properties, @qualifiers)
+            result.path = @path.clone unless @path.nil?
+            result
         end
 
         def properties=(properties)
@@ -922,8 +815,8 @@ module WBEM
         end
 
         def clone
-            return CIMParameter.new(@name, @param_type, @reference_class, 
-                                    @is_array, @array_size, @qualifiers)
+            CIMParameter.new(@name, @param_type, @reference_class, 
+                                      @is_array, @array_size, @qualifiers)
         end
 
         def qualifiers=(qualifiers)
@@ -1044,15 +937,13 @@ module WBEM
             end)
             return VALUE.new(WBEM.atomic_to_cim_xml(value))
         elsif (wrap_references and (value.is_a?(CIMInstanceName) or
-                                    value.is_a?(CIMClassName) or 
-                                    value.is_a?(CIMLocalClassPath)))
+                                    value.is_a?(CIMClassName)))
             return VALUE_REFERENCE.new(WBEM.atomic_to_cim_xml(value))
         elsif (value.methods.include?("tocimxml"))
             return value.tocimxml()
         elsif (value.is_a?(Array))
             if (wrap_references and (value[0].is_a?(CIMInstanceName) or  
-                                     value[0].is_a?(CIMClassName) or 
-                                     value.is_a?(CIMLocalClassPath)))
+                                     value[0].is_a?(CIMClassName)))
                 return VALUE_REFARRAY.new(value.collect {|val| WBEM.tocimxml(val, wrap_references)})
             else
                 return VALUE_ARRAY.new(value.collect {|val| WBEM.tocimxml(val, wrap_references)})
@@ -1068,6 +959,10 @@ module WBEM
         #builtin type."""
 
         # Lists of values
+
+        if (value.nil? || _type.nil?)
+            return nil
+        end
 
         if value.is_a?(Array)
             return value.collect { |val| WBEM.tocimobj(_type, val) }
@@ -1107,13 +1002,9 @@ module WBEM
             raise TypeError, "CIMType char16 not handled"
             # Datetime
         when "datetime"
-            if (value.nil?)
-                return nil
-            end
             tv_pattern = /^(\d{8})(\d{2})(\d{2})(\d{2})\.(\d{6})(:)(\d{3})/
             date_pattern = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\.(\d{6})([+|-])(\d{3})/
-            s = tv_pattern.match(value)
-            if (s.nil?)
+            if ((s = tv_pattern.match(value)).nil?)
 		if ((s = date_pattern.match(value)).nil?)
                     raise TypeError, "Invalid Datetime format #{value}"
                 end
@@ -1122,9 +1013,7 @@ module WBEM
                 # returning a rational num for the #days rather than a python timedelta
                 return TimeDelta.new(s[1].to_i, s[2].to_i, s[3].to_i, s[4].to_i, s[5].to_i)
             end
-            return value
         else
-            return nil if _type.nil?
             raise TypeError, "Invalid CIM type #{_type}"
         end
     end

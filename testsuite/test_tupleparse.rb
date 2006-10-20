@@ -56,13 +56,21 @@ module WBEM
                 self.test(CIMInstanceName.new('CIM_Foo', 
                                               {'Name' => 'Foo', 'Chicken' => 'Ham'}))
 
-                self.test(CIMInstanceName.new('CIM_Foo', {'Name' => 'Foo',
-                                        'Number' => 42,
-                                        'Boolean' => false,
-                                        'Ref' => CIMInstanceName.new('CIM_Bar')}))
+                self.test(CIMInstanceName.new('CIM_Foo', 
+                                              {'Name' => 'Foo',
+                                               'Number' => 42,
+                                               'Boolean' => false,
+                                               'Ref' => CIMInstanceName.new('CIM_Bar')}))
+
                 self.test(CIMInstanceName.new('CIM_Foo', {'Name' => 'Foo'},
                                                nil, 'root/cimv2'))
 
+                self.test(CIMInstanceName.new('CIM_Foo', {'Name' => 'Foo'},
+                                              'woot.com',
+                                              'root/cimv2'))
+                self.test(CIMInstanceName.new('CIM_Foo', {'Name' => 'Foo'},
+                                              nil, 'root/cimv2'))
+     
                 self.test(CIMInstanceName.new('CIM_Foo', {'Name' => 'Foo'},
                                               'woot.com',
                                               'root/cimv2'))
@@ -86,6 +94,12 @@ module WBEM
                                           {},
                                           CIMInstanceName.new('CIM_Foo',
                                                               {'InstanceID' => '1234'})))
+     
+                self.test(CIMInstance.new('CIM_Foo',
+                                          {'InstanceID' => '1234'},
+                                          {},
+                                          CIMInstanceName.new('CIM_Foo',
+                                                    {'InstanceID' => '1234'})))
             end
         end
 
@@ -137,13 +151,15 @@ module WBEM
 
                 self.test(CIMProperty.new('Spotty', 'Foot'))
                 self.test(CIMProperty.new('Age', Uint16.new(32)))
+                self.test(CIMProperty.new('Foo', '', 'string'))
+                self.test(CIMProperty.new('Foo', nil, 'string'))
                 self.test(CIMProperty.new('Age', nil, 'uint16', nil, nil, nil,
                                           {'Key' => CIMQualifier.new('Key', true)}))
 
                 # Property arrays
 
                 self.test(CIMProperty.new('Foo', ['a', 'b', 'c']))
-                self.test(CIMProperty.new('Foo', nil, 'string'))
+                self.test(CIMProperty.new('Foo', nil, 'string', nil, nil, true))
                 self.test(CIMProperty.new('Foo', [1, 2, 3].collect {|x| Uint8.new(x)},
                                           nil, nil, nil, nil, 
                                           {'Key' => CIMQualifier.new('Key', true)}))
