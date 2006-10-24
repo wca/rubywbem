@@ -150,9 +150,9 @@ module WBEM
             # Get XML response
 
             begin
-                resp_xml = WBEM.wbem_request(self.url, @last_raw_request, self.creds, 
+                resp_xml = WBEM.wbem_request(self.url, current_raw_request, self.creds, 
                                              headers, 0, self.x509, verify_callback)
-            rescue AuthError =>
+            rescue AuthError => ex
                 raise
             rescue CIMHttpError => arg
                 # Convert cim_http exceptions to CIMError exceptions
