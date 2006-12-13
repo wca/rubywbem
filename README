@@ -1,7 +1,10 @@
 RubyWBEM is a pure-Ruby library for performing operations using the WBEM
-management protocol. RubyWBEM originated as a direct port of PyWbem
-0.4, updated to the svn head as of revision 120.
+management protocol. RubyWBEM is mostly a  a direct port of PyWbem,
+current as of version 0.5, svn head revision 165
 
+Note that libopenssl-ruby is required to use rubywbem. I have not
+included this in the RPM deps, as, on Fedora at least, this is already
+included in the base ruby-libs package, which is already required by ruby.
 
 
 changes from PyWbem:
@@ -16,10 +19,6 @@ basic eql?, hash method definitions for xml objects
 Created valid_cimtype method which returns true if a value is a valid
   cim type (extends CIMType or is an appropriate native type (such as
   String, etc.)
-
-When setting properties for a CIMInstance, allow setting of
-  CIMProperty objects as well as values (to facilitate populating
-  property values from properties obtained from a GetClass call)
 
 CIMType changes:
   Since ruby doesn't support true multiple inheritance, CIMType wraps

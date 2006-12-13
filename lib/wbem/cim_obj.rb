@@ -667,6 +667,14 @@ module WBEM
             return VALUE_NAMEDINSTANCE.new(self.path.tocimxml,
                                            instance_xml)
         end
+
+        def tomof
+                
+            s = 'instance of %s {\n' % self.classname
+            s += '};\n'
+            return s
+        end
+
     end
 
     class CIMClass < XMLObject
@@ -739,6 +747,46 @@ module WBEM
                              self.qualifiers.values.collect {|q| q.tocimxml()},
                              self.superclass)
         end
+
+        def tomof
+            def _makequalifiers(qualifiers)
+                """Return a mof fragment for a NocaseDict of qualifiers."""
+                
+                if qualifiers.size() == 0
+                    return ''
+                end
+
+                result = (qualifiers.values.collect {|q| q.tomof}).join(', ')
+                return "[%s]" % result
+            end
+
+            # Class definition
+            
+            s = "%s\n" % _makequalifiers(self.qualifiers)
+            
+            s += "class %s " % self.classname
+
+            # Superclass
+            unless self.superclass.nil?
+                s += ": %s " % self.superclass
+            end
+            s += "{\n"
+
+            # Properties
+            self.properties.values.each do |p|
+                s += "\t%s\n" % _makequalifiers(p.qualifiers)
+                s += "\t%s %s;\n" % [p.prop_type, p.name]
+            end
+
+            # Methods
+            self.cim_methods.values.each do |m|
+                s += "\t%s\n" % _makequalifiers(m.qualifiers)
+                s += "\t%s\n" % m.tomof()
+            end
+
+            s += "};\n"
+            return s
+        end
     end
 
     class CIMMethod < XMLObject
@@ -795,6 +843,15 @@ module WBEM
 
         def to_s
             "#{self.class}(name=#{self.name}, return_type=#{self.return_type}...)"
+        end
+
+        def tomof
+            s = ''
+            unless self.return_type.nil?
+                s += "%s " % self.return_type
+            end
+            s += "%s(%s);" % [self.name, (self.parameters.values.collect {|p| p.tomof}).join(', ')]
+            return s
         end
     end
 
@@ -865,6 +922,10 @@ module WBEM
                                      self.qualifiers.values.collect { |q| q.tocimxml})
             end
         end
+
+        def tomof
+            return "%s %s" % [self.prop_type, self.name]
+        end
     end
 
     class CIMQualifier < XMLObject
@@ -913,6 +974,23 @@ module WBEM
             ret_val = nilcmp(self.translatable, other.translatable) if (ret_val == 0)
             ret_val
         end
+
+        def tomof
+
+            def valstr(v)
+                if v.is_a?(String)
+                    return '"' + v + '"'
+                else
+                    return v.to_s
+                end
+            end
+
+            if  self.value.is_a?(Array)
+                return "#{self.name} {" + (self.value.collect {|v| valstr(v)}).join(', ') + '}'
+            end
+            return "%s (%s)" % [self.name, valstr(self.value)]
+        end
+
         def tocimxml
             QUALIFIER.new(self.name, 
                           self.qual_type,

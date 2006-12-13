@@ -94,15 +94,15 @@ module WBEM
             h.start do |http|
                 request = Net::HTTP::Post.new("/cimom")
                 request.basic_auth creds[0], creds[1]
-                request.content_type = "application/xml"
+                request.content_type = 'application/xml; charset="utf-8"'
                 request.content_length = data.length
                 headers.each do |header|
                     s = header.split(":", 2).collect { |x| x.strip }
                     request.add_field(URI.escape(s[0]), URI.escape(s[1]))
                 end
-                #            STDOUT << "request: #{data}\n"
+                #STDOUT << "request: #{data}\n"
                 response = http.request(request, data)
-                #            STDOUT << "response: #{response.body}\n"
+                #STDOUT << "response: #{response.body}\n"
             end
         rescue OpenSSL::SSL::SSLError => arg
             raise CIMHttpError, "SSL error: %s" % (arg)

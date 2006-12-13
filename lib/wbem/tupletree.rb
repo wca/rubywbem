@@ -47,26 +47,6 @@ require "rexml/document"
 
 module WBEM
 
-    def tupletree_to_dom(document, tree, parent=nil)
-#    """Convert tupletree to an XML DOM tree within a document.
-#    """
-#    import types
-        name, attrs, contents, junk = tree
-    
-        parent = document if parent.nil?
-        elt = Element.new(name, parent)
-
-        attrs.each { |key, val| elt.add_attribute(key, val) }
-        contents.each do |child|
-            if child.is_a? Array
-                tupletree_to_dom(document, child, elt)
-            else
-                elt.add_text(child)
-            end
-        end
-        return elt
-    end
-
     def WBEM.dom_to_tupletree(node)
 #     """Convert a DOM object to a pyRXP-style tuple tree.
 

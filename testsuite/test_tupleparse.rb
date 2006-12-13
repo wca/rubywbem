@@ -48,6 +48,20 @@ module WBEM
             end
         end
 
+        class RawXMLTest < Comfychair::TestCase
+
+            def test(xml, obj)
+
+                # Parse raw XML to an object
+
+                result = WBEM.parse_any(WBEM.xml_to_tupletree(xml))
+                self.log('parsed XML: %s' % result)
+
+                # Assert XML parses to particular Python object
+
+                self.assert_equal(obj, result)
+            end
+        end
         class ParseCIMInstanceName < TupleTest
             #"""Test parsing of CIMInstanceName objects."""
            
@@ -207,6 +221,18 @@ module WBEM
                 self.test(CIMParameter.new('RefArray', 'reference', 'CIM_Foo', true, 10,
                                            {'Key' => CIMQualifier.new('Key', true)}))
             end
+
+        end
+
+        class ParseXMLKeyValue < RawXMLTest
+
+            def runtest
+                
+                self.test('<KEYVALUE VALUETYPE="numeric">1234</KEYVALUE>', 1234)
+                
+                self.test('<KEYVALUE TYPE="uint32" VALUETYPE="numeric">1234</KEYVALUE>',
+                          1234)
+            end
         end
 
         TESTS = [
@@ -215,6 +241,11 @@ module WBEM
                  ParseCIMClass,
                  ParseCIMProperty,
                  ParseCIMParameter,
+                 
+                 # Parse specific bits of XML
+                 
+                 ParseXMLKeyValue,
+                 
                 ]
         
         if __FILE__ == $0

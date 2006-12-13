@@ -391,14 +391,11 @@ module WBEM
         def CreateInstance(newinstance, params = {})
             #"""Create an instance.  Returns the name for the instance."""
 
-            if newinstance.path.nil?
-                raise ArgumentError, 'newinstance parameter must have path attribute set'
-            end
-
-            if newinstance.path.namespace.nil?
-                params[:namespace] = self.default_namespace
-            else
+            if (!newinstance.path.nil? && 
+                !newinstance.path.namespace.nil?)
                 params[:namespace] = newinstance.path.namespace
+            else
+                params[:namespace] = self.default_namespace
             end
             namespace = params[:namespace]
 
@@ -679,7 +676,11 @@ module WBEM
                 output_params = {}
                 
                 result[1..-1].each do |p|
-                    output_params[p[0]] = tocimobj(p[1], p[2])
+                    if p[1] == 'reference'
+                        output_params[p[0]] = p[2]
+                    else
+                        output_params[p[0]] = tocimobj(p[1], p[2])
+                    end
                 end
                 return returnvalue, output_params
             else

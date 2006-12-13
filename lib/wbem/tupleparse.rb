@@ -596,18 +596,27 @@ module WBEM
     def WBEM.parse_keyvalue(tt)
     ##<!ELEMENT KEYVALUE (#PCDATA)>
     ##<!ATTLIST KEYVALUE
-    ##          VALUETYPE (string | boolean | numeric) "string">
+    ##          VALUETYPE (string | boolean | numeric) "string"
+    ##          %CIMType;              #IMPLIED>
+
 
 #    """Parse VALUETYPE into Python primitive value"""
     
-        WBEM.check_node(tt, "KEYVALUE", [], ["VALUETYPE"], [], true)
-        vt = WBEM.attrs(tt).fetch("VALUETYPE", "string")
+        WBEM.check_node(tt, 'KEYVALUE', ['VALUETYPE'], ['TYPE'], [], true)
+        vt = WBEM.attrs(tt).fetch('VALUETYPE')
+
         p = WBEM.pcdata(tt)
         if vt == "string"
             return p
         elsif vt == "boolean"
             return WBEM.unpack_boolean(p)
         elsif vt == "numeric"
+            # XXX: Use TYPE attribute to create named CIM type.
+            # if attrs(tt).has_key('TYPE'):
+            #    return cim_obj.tocimobj(attrs(tt)['TYPE'], p.strip())
+            
+            # XXX: Would like to use long() here, but that tends to cause
+            # trouble when it's written back out as '2L'
             return p.strip().to_i
         else
             raise ParseError, "invalid VALUETYPE #{vt} in #{WBEM.name(tt)}"

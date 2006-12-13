@@ -1,6 +1,8 @@
 This directory contains the tests for RubyWBEM.
 
-The CIM operations test depends on ruby-password and ruby-termios
+In order to run the tests, xmllint is required (libxml2 package on
+Fedora -- possibly libxml2-utils, etc. on other systems). In addition,
+the the CIM operations test depends on ruby-password and ruby-termios
 (available at http://www.caliban.org/ruby/ruby-password.shtml) 
 
 To run the CIM operations test, the test.mof file must be loaded in to

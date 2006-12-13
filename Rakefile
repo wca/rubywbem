@@ -69,7 +69,7 @@ end
 
 # First you'll need to assemble a gemspec
 
-PKG_VERSION 	= "0.1.0"
+PKG_VERSION 	= "0.2.0"
 #PKG_FILES 	= FileList['lib/**/*.rb', 'bin/**/*', 'examples/**/*', '[A-Z]*', 'testsuite/**/*'].to_a
 PKG_FILES 	= FileList['lib/**/*.rb', '[A-Z]*', '*.spec', 'testsuite/**/*.rb', 'testsuite/**/*.sh', 'testsuite/**/*.dtd'].to_a
 

@@ -663,6 +663,20 @@ module WBEM
                 self.validate(obj)        
             end
         end
+
+        class CIMInstanceToMOF < Comfychair::TestCase
+
+            def runtest
+
+                i = CIMInstance.new('CIM_Foo',
+                                    {'string' => 'string',
+                                     'uint8' => Uint8.new(0),
+                                     'uint8array' => [Uint8.new(1), Uint8.new(2)],
+                                     'ref' => CIMInstanceName.new('CIM_Bar')})
+
+                i.tomof()
+            end
+        end
         #################################################################
         # CIMProperty
         #################################################################
@@ -1166,6 +1180,17 @@ module WBEM
             end
         end
 
+        class CIMClassToMOF < Comfychair::TestCase
+            
+            def runtest
+                
+                c = CIMClass.new('CIM_Foo',
+                                 {'InstanceID' => CIMProperty.new('InstanceID', nil, 'string')})
+                
+                c.tomof()
+            end
+        end
+
         #################################################################
         # CIMMethod
         #################################################################
@@ -1580,6 +1605,7 @@ module WBEM
                  CIMInstanceSort,
                  CIMInstanceString,
                  CIMInstanceToXML,
+                 CIMInstanceToMOF,
 
                  #############################################################
                  # Schema classes
@@ -1595,6 +1621,7 @@ module WBEM
                  CIMClassSort,
                  CIMClassString,
                  CIMClassToXML,
+                 CIMClassToMOF,
 
                  # TODO: CIMClassName
     

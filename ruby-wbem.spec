@@ -2,7 +2,7 @@
 
 Summary: RubyWBEM is a pure-Ruby library for performing operations using the WBEM management protocol
 Name: ruby-wbem
-Version: 0.1
+Version: 0.2
 Release: 1
 License: GPL
 Group: Systems Management/Base
