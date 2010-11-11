@@ -139,13 +139,13 @@ module WBEM
                               '2.0', '2.0')
             
             current_raw_request = ""
-            req_xml.write(current_raw_request)
+            formatter = REXML::Formatters::Default.new
+            formatter.write(req_xml, current_raw_request)
             if @debug
                 @last_raw_request = current_raw_request
-                @last_request = ""
+                @last_request = req_xml
                 @last_reply = ""
                 @last_raw_reply = ""
-                req_xml.write(@last_request, 2)
             end
             # Get XML response
 

@@ -93,6 +93,7 @@ module WBEM
 #     """Return the concatenated character data within a tt.
 
 #     The tt must not have non-character children."""
+        return "" unless tt
         tt[2].each do |x|
             unless x.is_a? String
                 raise ParseError, "unexpected node #{x} under #{tt}"
@@ -102,10 +103,12 @@ module WBEM
     end
 
     def WBEM.name(tt)
+        return "" unless tt
         tt[0]
     end
 
     def WBEM.attrs(tt)
+        return "" unless tt
         tt[1]
     end
 

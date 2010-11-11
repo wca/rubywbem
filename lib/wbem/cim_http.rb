@@ -93,7 +93,7 @@ module WBEM
         begin
             h.start do |http|
                 request = Net::HTTP::Post.new("/cimom")
-                request.basic_auth creds[0], creds[1]
+                request.basic_auth(creds[0], creds[1]) if creds
                 request.content_type = 'application/xml; charset="utf-8"'
                 request.content_length = data.length
                 headers.each do |header|
